@@ -1,5 +1,7 @@
 import "./App.css";
-import {useEffect, useRef} from "react";
+import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getQuotes } from "./getQuotes.ts";
 
 const quotes = [
   "The only limit to our realization of tomorrow will be our doubts of today. – Franklin D. Roosevelt",
@@ -17,48 +19,50 @@ function App() {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if(!ref.current) {
+    if (!ref.current) {
       return;
     }
 
     const options = {
       root: ref.current as HTMLDivElement,
-      rootMargin: '0px',
-      threshold: 1
-    }
+      rootMargin: "0px",
+      threshold: 1,
+    };
 
     const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if(entry.isIntersecting) {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
           const element = entry.target;
-          if(element.className.includes("list-item")) {
+          if (element.className.includes("list-item")) {
             observer.unobserve(element);
           }
           console.log(element.innerHTML);
         }
-      })
+      });
     }, options);
 
-    const listItems = document.querySelectorAll('.list-item');
-    listItems.forEach(item => {
+    const listItems = document.querySelectorAll(".list-item");
+    listItems.forEach((item) => {
       observer.observe(item);
-    })
+    });
 
-    const trigger = document.querySelector('.trigger');
+    const trigger = document.querySelector(".trigger");
 
     observer.observe(trigger);
 
     return () => {
       observer.disconnect();
-    }
+    };
   }, []);
+
+  const query = useQuery({ queryKey: ["quotes"], queryFn: getQuotes });
 
   return (
     <div className="container" ref={ref}>
       <ol>
-        {quotes.map((quote) => (
-          <li key={quote} className="list-item">
-            {quote}
+        {query.data?.map((quote) => (
+          <li key={quote.id} className="list-item">
+            {quote.text}
           </li>
         ))}
         <li className="trigger">Load more...</li>
