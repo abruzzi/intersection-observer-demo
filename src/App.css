@@ -1,12 +1,12 @@
 #root {
   max-width: 500px;
-  margin: 0 auto;
+  margin: 2rem auto;
   padding: 2rem;
 }
 
 .container {
-  border: 1px solid red;
-  max-height: 320px;
+  border: 1px solid deeppink;
+  max-height: 300px;
   overflow: auto;
 }
 
