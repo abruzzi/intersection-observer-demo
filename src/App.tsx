@@ -1,7 +1,9 @@
 import "./App.css";
-import { useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getQuotes } from "./getQuotes.ts";
+import { Fragment, useEffect, useRef } from "react";
+import {
+  useInfiniteQuery,
+} from "@tanstack/react-query";
+import { getQuotesPaginated, PaginatedQuotes } from "./getQuotes.ts";
 
 const quotes = [
   "The only limit to our realization of tomorrow will be our doubts of today. – Franklin D. Roosevelt",
@@ -17,6 +19,19 @@ const quotes = [
 
 function App() {
   const ref = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLLIElement | null>(null);
+
+  const { data, fetchNextPage, hasNextPage } =
+    useInfiniteQuery<PaginatedQuotes>({
+      queryKey: ["quotes"],
+      queryFn: async ({ pageParam = 1 }) => getQuotesPaginated(pageParam),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: PaginatedQuotes): number | undefined => {
+        return lastPage.meta.hasMore
+          ? Number(lastPage.meta.currentPage) + 1
+          : undefined;
+      },
+    });
 
   useEffect(() => {
     if (!ref.current) {
@@ -26,46 +41,45 @@ function App() {
     const options = {
       root: ref.current as HTMLDivElement,
       rootMargin: "0px",
-      threshold: 1,
+      threshold: 0.5,
     };
 
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           const element = entry.target;
-          if (element.className.includes("list-item")) {
-            observer.unobserve(element);
+          if (element.className.includes("trigger") && hasNextPage) {
+            fetchNextPage();
           }
-          console.log(element.innerHTML);
         }
       });
     }, options);
 
-    const listItems = document.querySelectorAll(".list-item");
-    listItems.forEach((item) => {
-      observer.observe(item);
-    });
-
-    const trigger = document.querySelector(".trigger");
-
-    observer.observe(trigger);
+    if (triggerRef.current) {
+      observer.observe(triggerRef.current as HTMLLIElement);
+    }
 
     return () => {
       observer.disconnect();
     };
   }, []);
 
-  const query = useQuery({ queryKey: ["quotes"], queryFn: getQuotes });
 
   return (
     <div className="container" ref={ref}>
       <ol>
-        {query.data?.map((quote) => (
-          <li key={quote.id} className="list-item">
-            {quote.text}
-          </li>
+        {data?.pages.map((page, pageIndex) => (
+          <Fragment key={pageIndex}>
+            {page.quotes.map((quote) => (
+              <li key={quote.id} className="list-item">
+                {quote.text} - {quote.author}
+              </li>
+            ))}
+          </Fragment>
         ))}
-        <li className="trigger">Load more...</li>
+        <li className="trigger" ref={triggerRef}>
+          {hasNextPage ? "Load more..." : ""}
+        </li>
       </ol>
     </div>
   );
