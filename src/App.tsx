@@ -1,17 +1,6 @@
 import "./App.css";
-import { useEffect, useRef, useState } from "react";
-
-const quotes = [
-  "The only limit to our realization of tomorrow will be our doubts of today. – Franklin D. Roosevelt",
-  "Do what you can, with what you have, where you are. – Theodore Roosevelt",
-  "Don’t count the days, make the days count. – Muhammad Ali",
-  "Hardships often prepare ordinary people for an extraordinary destiny. – C.S. Lewis",
-  "Success is walking from failure to failure with no loss of enthusiasm. – Winston Churchill",
-  "It does not matter how slowly you go as long as you do not stop. – Confucius",
-  "You miss 100% of the shots you don’t take. – Wayne Gretzky",
-  "Strive not to be a success, but rather to be of value. – Albert Einstein",
-  "Dream big and dare to fail. – Norman Vaughan",
-];
+import { Fragment, useEffect, useRef, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 type Quote = {
   id: number;
@@ -40,25 +29,20 @@ const fetchQuotes = async (page: number = 1): Promise<PaginatedQuotes> => {
 function App() {
   const ref = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLLIElement | null>(null);
-  const [quoteList, setQuoteList] = useState<Quote[]>([]);
 
-  const page = useRef<number>(1);
-  const hasMore = useRef<boolean>(true);
-
-  const fetchNext = async () => {
-    const { meta, quotes } = await fetchQuotes(page.current);
-    setQuoteList(quoteList => [...quoteList, ...quotes]);
-
-    if(meta.hasMore) {
-      page.current = page.current + 1;
-    }
-
-    hasMore.current = meta.hasMore;
-  };
-
-  useEffect(() => {
-    fetchNext();
-  }, []);
+  const { data, hasNextPage, fetchNextPage } =
+    useInfiniteQuery<PaginatedQuotes>({
+      queryKey: ["quotes"],
+      queryFn: ({ pageParam = 1 }) => fetchQuotes(pageParam),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage: PaginatedQuotes) => {
+        if (lastPage.meta.hasMore) {
+          return Number(lastPage.meta.currentPage) + 1;
+        } else {
+          return undefined;
+        }
+      },
+    });
 
   useEffect(() => {
     if (!ref.current) {
@@ -72,8 +56,8 @@ function App() {
     };
 
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && hasMore.current) {
-        fetchNext();
+      if (entries[0].isIntersecting && hasNextPage) {
+        fetchNextPage();
       }
     }, options);
 
@@ -84,18 +68,25 @@ function App() {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [hasNextPage]);
 
   return (
     <div className="container" ref={ref}>
       <ol>
-        {quoteList.map((quote) => (
-          <li key={quote.id} className="list-item">
-            {quote.text} - {quote.author}
-          </li>
-        ))}
+        {data?.pages?.map((page, index) => {
+          return (
+            <Fragment key={index}>
+              {page.quotes.map((quote) => (
+                <li key={quote.id} className="list-item">
+                  {quote.text} - {quote.author}
+                </li>
+              ))}
+            </Fragment>
+          );
+        })}
+
         <li className="trigger" ref={triggerRef}>
-          Load more...
+          {hasNextPage ? "Load more..." : ""}
         </li>
       </ol>
     </div>
